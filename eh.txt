@@ -1,0 +1,3 @@
+A[cpss]=100[cps]/TC[s]
+T[s]=S[cps]*TC[s]/100[cps]
+S[cps]=Sqrt(D[c]*0.0002[cpm]/TC[m])
