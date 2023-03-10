@@ -1,22 +1,21 @@
 package main
 
 import (
-	"encoding/binary"
 	"io"
 	"os"
 	"sync"
 
-	misc "github.com/IgneousRed/gomisc"
+	m "github.com/IgneousRed/gomisc"
 )
 
-type Button byte
+type Button u8
 
 const (
-	BUp = Button(iota)
+	BRight Button = iota
+	BUp
 	BLeft
-	BMiddle
-	BRight
 	BDown
+	BMiddle
 )
 
 var buttons [5]bool
@@ -24,24 +23,22 @@ var buttonsMutex sync.RWMutex
 
 func init() {
 	file, err := os.Open("/dev/input/by-path/platform-gpio_keys-event")
-	misc.FatalErr("", err)
+	m.FatalErr("", err)
 	go func() {
-		var keyToButton = [109]byte{
-			103: 0,
-			105: 1,
-			28:  2,
-			106: 3,
-			108: 4,
+		defer file.Close()
+		buf, keyToButton := [16]u8{}, [109]u8{
+			28:  u8(BMiddle),
+			106: u8(BRight),
+			103: u8(BUp),
+			105: u8(BLeft),
+			108: u8(BDown),
 		}
-		var buf [16]byte
 		for {
 			_, err := io.ReadFull(file, buf[:])
-			misc.FatalErr("", err)
-			key, _ := binary.Uvarint(buf[10:12])
-			if key != 0 {
-				val, _ := binary.Uvarint(buf[12:16])
+			m.FatalErr("", err)
+			if key := buf[10]; key != 0 {
 				buttonsMutex.Lock()
-				buttons[keyToButton[key]] = misc.IToB(val)
+				buttons[keyToButton[key]] = m.NToB(buf[12])
 				buttonsMutex.Unlock()
 			}
 		}
@@ -49,7 +46,7 @@ func init() {
 }
 func Buttons() [5]bool {
 	buttonsMutex.RLock()
-	temp := buttons
+	result := buttons
 	buttonsMutex.RUnlock()
-	return temp
+	return result
 }

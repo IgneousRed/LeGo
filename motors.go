@@ -1,28 +1,27 @@
 package main
 
 import (
-	"log"
 	"os"
 	"time"
 
-	misc "github.com/IgneousRed/gomisc"
+	m "github.com/IgneousRed/gomisc"
 )
 
 const motorPath = "/sys/class/tacho-motor"
 const CountPerRot = 360
 
-type MotorType byte
+type MotorType u8
 
 const (
-	MTNone = MotorType(iota)
+	MTNone MotorType = iota
 	MTLarge
 	MTMedium
 )
 
-type PidK byte
+type PidK u8
 
 const (
-	PKP = PidK(iota)
+	PKP PidK = iota
 	PKI
 	PKD
 )
@@ -40,31 +39,37 @@ type Motor struct {
 
 var motorsInitialized bool
 
-func (m Motor) read(attribute string) string {
-	val, err := os.ReadFile(m.path + attribute)
-	misc.FatalErr("", err)
-	return string(val[:len(val)-1])
+// Removes "/n" at the end
+func removeNL(b []u8) string {
+	return string(b[:len(b)-1])
 }
-func (m Motor) write(attribute, value string) {
-	f, err := os.OpenFile(m.path+attribute, os.O_WRONLY|os.O_TRUNC, 0)
-	misc.FatalErr("", err)
-	_, err = f.WriteString(value)
-	misc.FatalErr("", err)
-	f.Close()
+
+// Read motor attribute
+func (mt Motor) read(attribute string) string {
+	val, err := os.ReadFile(mt.path + attribute)
+	m.FatalErr("", err)
+	return removeNL(val)
+}
+
+// Write motor attribute
+func (mt Motor) write(attribute, value string) {
+	m.FatalErr("", os.WriteFile(mt.path+attribute, []u8(value), 0))
 }
 
 // Blocks until requested Motors are correctly connected.
-// Initialize Display before Motors.
-func MotorsInit(portA, portB, portC, portD MotorType, dsp Display) (a, b, c, d Motor) {
-	misc.FatalIf(motorsInitialized, "Motors already Initialized")
+func MotorsInit(portA, portB, portC, portD MotorType, dsp Display,
+) (a, b, c, d Motor) {
+	m.FatalIf(motorsInitialized, "Motors already Initialized")
 	ports := [4]MotorType{portA, portB, portC, portD}
-	var motors [4]Motor
+
+	// Begin
+	var result [4]Motor
 	for {
 		// Find connected Motors
 		f, err := os.Open(motorPath)
-		misc.FatalErr("", err)
+		m.FatalErr("", err)
 		names, err := f.Readdirnames(0)
-		misc.FatalErr("", err)
+		m.FatalErr("", err)
 		f.Close()
 
 		// Populate conections
@@ -78,26 +83,26 @@ func MotorsInit(portA, portB, portC, portD MotorType, dsp Display) (a, b, c, d M
 					retry = true
 					return ""
 				}
-				return string(val[:len(val)-1]) // Removes "\n" at the end
+				return removeNL(val)
 			}
-			port := attribute("address")
-			motor := attribute("driver_name")
+			port, motor := attribute("address"), attribute("driver_name")
 			if retry {
 				break
 			}
-			var portNum = map[string]int{
+			portNum := map[string]int{
 				"ev3-ports:outA": 0,
 				"ev3-ports:outB": 1,
 				"ev3-ports:outC": 2,
 				"ev3-ports:outD": 3,
 			}
-			var motorType = map[string]MotorType{ // warning on other types
+			motorType := map[string]MotorType{
 				"lego-ev3-l-motor": MTLarge,
 				"lego-ev3-m-motor": MTMedium,
 			}
 			i := portNum[port]
-			connected[i] = motorType[motor]
-			motors[i].path = path
+			mt, ok := motorType[motor]
+			connected[i] = m.Ternary(ok, mt, MTNone)
+			result[i].path = path
 		}
 		if retry {
 			continue
@@ -105,7 +110,7 @@ func MotorsInit(portA, portB, portC, portD MotorType, dsp Display) (a, b, c, d M
 
 		// Does mismatch exist
 		mismatch := false
-		for i := range motors {
+		for i := range result {
 			if connected[i] != ports[i] {
 				mismatch = true
 				break
@@ -117,24 +122,25 @@ func MotorsInit(portA, portB, portC, portD MotorType, dsp Display) (a, b, c, d M
 		}
 
 		// Prints help
-		dsp.Write(1, 2, "Motors")
-		for i := range motors {
-			var motorName = [3]string{"None", "Large", "Medium"}
-			postFix := misc.Ternary(connected[i] != ports[i], motorName[ports[i]], "Ok")
-			dsp.Write(i+2, 0, string(rune('A'+i))+": "+postFix)
+		dsp.Write(2, 1, "Motors")
+		for i := range result {
+			dsp.Write(0, i+2, string(rune('A'+i))+": "+
+				m.Ternary(connected[i] != ports[i],
+					[4]string{"None", "Large", "Medium"}[ports[i]], "Ok",
+				),
+			)
 		}
 		time.Sleep(time.Millisecond * 100)
 	}
 
 	// Cache MaxSpeed
-	for i := range motors {
+	for i := range result {
 		if ports[i] != MTNone {
-			max, _ := misc.AToI[uint](motors[i].read("max_speed"))
-			motors[i].maxSpeed = max
+			result[i].maxSpeed, _ = m.AToI[uint](result[i].read("max_speed"))
 		}
 	}
 	motorsInitialized = true
-	return motors[0], motors[1], motors[2], motors[3]
+	return result[0], result[1], result[2], result[3]
 }
 
 // At start all motors are reset
@@ -142,10 +148,10 @@ func MotorsInit(portA, portB, portC, portD MotorType, dsp Display) (a, b, c, d M
 // hold pid setting effective immediately. Check every value dep
 // wrong dutycycle gives error
 
-type MotorCommand byte
+type MotorCommand u8
 
 const (
-	MCRunForever = MotorCommand(iota)
+	MCRunForever MotorCommand = iota
 	MCRunAbsPos
 	MCRunRelPos
 	MCRunTimed
@@ -165,58 +171,55 @@ var motorCommand = [7]string{
 }
 
 // CRunForever: Runs forever.
-// CRunAbsPos: Runs to PositionSetpoint then applies StopAction.
-// CRunRelPos: Runs additional PositionSetpoint then applies StopAction.
-// CRunTimed: Runs for TimeSetpoint then applies StopAction.
-// CRunDirect: Runs forever using the DutyCycleSetpoint.
-// Unlike other commands, changing DutyCycleSetpoint takes effect immediately.
+// CRunAbsPos: Runs to PositionTarget then applies StopAction.
+// CRunRelPos: Runs additional PositionTarget then applies StopAction.
+// CRunTimed: Runs for TimeTarget then applies StopAction.
+// CRunDirect: Runs forever using the PowerTarget.
+// Unlike other commands, changing PowerTarget takes effect immediately.
 // CStop: Applies StopAction.
 // CReset: Resets all attributes to default and puts it into Coast mode.
-func (m Motor) Command(command MotorCommand) {
-	m.write("command", motorCommand[command])
+func (mt Motor) Command(command MotorCommand) {
+	mt.write("command", motorCommand[command])
 }
 
-// Returns the current DutyCycle(power given) in percentage[-100, 100].
-func (m Motor) DutyCycle() (percent int) {
-	percent, _ = misc.AToI[int](m.read("duty_cycle"))
+// Returns the current Power in percentage[-100, 100].
+func (mt Motor) Power() (percent int) {
+	percent, _ = m.AToI[int](mt.read("duty_cycle"))
 	return
 }
 
-// Returns the DutyCycleSetpoint in percentage[-100, 100].
-func (m Motor) DutyCycleSetpointGet() (percent int) {
-	percent, _ = misc.AToI[int](m.read("duty_cycle_sp"))
+// Returns the PowerTarget in percentage[-100, 100].
+func (mt Motor) PowerTargetGet() (percent int) {
+	percent, _ = m.AToI[int](mt.read("duty_cycle_sp"))
 	return
 }
 
-// Declares the DutyCycleSetpoint in percentage[-100, 100].
-func (m Motor) DutyCycleSetpointSet(percent int) {
-	clamped, flag := misc.ClampReport(percent, -100, 100)
-	if flag {
-		log.Println("Warning: DutyCycle " + misc.IToA(percent) + " is outside [-100, 100] range")
-	}
-	m.write("duty_cycle_sp", misc.IToA(clamped))
+// Declares the PowerTarget in percentage[-100, 100].
+// Setting outside [-100, 100] range crashes the program.
+func (mt Motor) PowerTargetSet(percent int) { // TODO: Test
+	mt.write("duty_cycle_sp", m.IToA(percent))
 }
 
 // Returns the PID controller constant for holding position.
-func (m Motor) HoldPidGet(k PidK) (gain uint) {
-	gain, _ = misc.AToI[uint](m.read("hold_pid/" + pidK[k]))
+func (mt Motor) HoldPidGet(k PidK) (gain uint) {
+	gain, _ = m.AToI[uint](mt.read("hold_pid/" + pidK[k]))
 	return
 }
 
 // Declares the PID controller constant for holding position.
-func (m Motor) HoldPidSet(k PidK, gain uint) {
-	m.write("hold_pid/"+pidK[k], misc.IToA(gain))
+func (mt Motor) HoldPidSet(k PidK, gain uint) {
+	mt.write("hold_pid/"+pidK[k], m.IToA(gain))
 }
 
 // Returns the theoretical maximum speed given no load.
-func (m Motor) MaxSpeed() (speed uint) {
-	return m.maxSpeed
+func (mt Motor) MaxSpeed() (speed uint) {
+	return mt.maxSpeed
 }
 
-type Polarity byte
+type Polarity u8
 
 const (
-	PNormal = Polarity(iota)
+	PNormal Polarity = iota
 	PInversed
 )
 
@@ -226,8 +229,8 @@ var polarityEnum = map[string]Polarity{
 }
 
 // Returns the direction of the motor.
-func (m Motor) PolarityGet() Polarity {
-	return polarityEnum[m.read("polarity")]
+func (mt Motor) PolarityGet() Polarity {
+	return polarityEnum[mt.read("polarity")]
 }
 
 var polarityString = [2]string{
@@ -237,90 +240,95 @@ var polarityString = [2]string{
 
 // Declares the direction of the motor.
 // Changing inverts values for position, speed and dutycycle
-func (m Motor) PolaritySet(polarity Polarity) {
-	m.write("polarity", polarityString[polarity])
+func (mt Motor) PolaritySet(polarity Polarity) {
+	mt.write("polarity", polarityString[polarity])
 }
 
 // Returns the current tacho count.
-func (m Motor) PositionGet() (count int) {
-	count, _ = misc.AToI[int](m.read("position"))
+func (mt Motor) PositionGet() (count int) {
+	count, _ = m.AToI[int](mt.read("position"))
 	return
 }
 
 // Declares the current tacho count.
-func (m Motor) PositionSet(count int) {
-	m.write("position", misc.IToA(count))
+func (mt Motor) PositionSet(count int) {
+	mt.write("position", m.IToA(count))
 }
 
-// Returns the PositionSetpoint.
-func (m Motor) PositionSetpointGet() (count int) {
-	count, _ = misc.AToI[int](m.read("position_sp"))
+// Returns the PositionTarget.
+func (mt Motor) PositionTargetGet() (count int) {
+	count, _ = m.AToI[int](mt.read("position_sp"))
 	return
 }
 
-// Declares the PositionSetpoint.
-func (m Motor) PositionSetpointSet(count int) {
-	m.write("position_sp", misc.IToA(count))
+// Declares the PositionTarget.
+func (mt Motor) PositionTargetSet(count int) {
+	mt.write("position_sp", m.IToA(count))
 }
 
 // Returns the RampDown time in millis.
-// RampDown is time it takes the motor to decrease DutyCycle from 100% to 0% in X modes. TODO: Test
-func (m Motor) RampDownGet() (millis uint) {
-	millis, _ = misc.AToI[uint](m.read("ramp_down_sp"))
+// RampDown is time it takes the motor to decrease Power
+// from 100% to 0% in X modes. TODO: Test
+func (mt Motor) RampDownGet() (millis uint) {
+	millis, _ = m.AToI[uint](mt.read("ramp_down_sp"))
 	return
 }
 
 // Declares the RampDown time in millis.
-// RampDown is time it takes the motor to decrease DutyCycle from 100% to 0% in X modes.
-func (m Motor) RampDownSet(millis uint) {
-	m.write("ramp_down_sp", misc.IToA(millis))
+// RampDown is time it takes the motor to decrease Power
+// from 100% to 0% in X modes.
+func (mt Motor) RampDownSet(millis uint) {
+	mt.write("ramp_down_sp", m.IToA(millis))
 }
 
 // Returns the RampUp time in millis.
-// RampUp is time it takes the motor to increase DutyCycle from 0% to 100% in X modes.
-func (m Motor) RampUpGet() (millis uint) {
-	millis, _ = misc.AToI[uint](m.read("ramp_up_sp"))
+// RampUp is time it takes the motor to increase Power
+// from 0% to 100% in X modes.
+func (mt Motor) RampUpGet() (millis uint) {
+	millis, _ = m.AToI[uint](mt.read("ramp_up_sp"))
 	return
 }
 
 // Declares the RampUp time in millis.
-// RampUp is time it takes the motor to increase DutyCycle from 0% to 100% in X modes.
-func (m Motor) RampUpSet(millis uint) {
-	m.write("ramp_up_sp", misc.IToA(millis))
+// RampUp is time it takes the motor to increase Power
+// from 0% to 100% in X modes.
+func (mt Motor) RampUpSet(millis uint) {
+	mt.write("ramp_up_sp", m.IToA(millis))
 }
 
 // Returns the current motor speed.
-func (m Motor) Speed() (speed int) {
-	speed, _ = misc.AToI[int](m.read("speed"))
+func (mt Motor) Speed() (speed int) {
+	speed, _ = m.AToI[int](mt.read("speed"))
 	return
 }
 
 // Returns the PID controller constant for maintaining speed.
-func (m Motor) SpeedPidGet(k PidK) (gain uint) {
-	gain, _ = misc.AToI[uint](m.read("speed_pid/" + pidK[k]))
+func (mt Motor) SpeedPidGet(k PidK) (gain uint) {
+	gain, _ = m.AToI[uint](mt.read("speed_pid/" + pidK[k]))
 	return
 }
 
 // Declares the PID controller constant for maintaining speed.
-func (m Motor) SpeedPidSet(k PidK, gain uint) {
-	m.write("speed_pid/"+pidK[k], misc.IToA(gain))
+func (mt Motor) SpeedPidSet(k PidK, gain uint) {
+	mt.write("speed_pid/"+pidK[k], m.IToA(gain))
 }
 
-// Returns the SpeedSetpoint.
-func (m Motor) SpeedSetpointGet() (speed int) {
-	speed, _ = misc.AToI[int](m.read("speed_sp"))
+// Returns the SpeedTarget.
+func (mt Motor) SpeedTargetGet() (speed int) {
+	speed, _ = m.AToI[int](mt.read("speed_sp"))
 	return
 }
 
-// Declares the SpeedSetpoint.
-func (m Motor) SpeedSetpointSet(speed int) {
-	m.write("speed_sp", misc.IToA(speed))
+// Declares the SpeedTarget.
+// Setting outside [-MaxSpeed, MaxSpeed] range crashes the program.
+func (mt Motor) SpeedTargetSet(speed int) {
+	mt.write("speed_sp", m.IToA(speed))
 }
 
-type State byte
+type State u8
 
 const (
-	SNil = State(iota)
+	SNil State = iota
 	SRunning
 	SRamping
 	SHolding
@@ -338,14 +346,14 @@ var stateEnum = map[string]State{
 }
 
 // TODO: Desc
-func (m Motor) State() State {
-	return stateEnum[m.read("state")]
+func (mt Motor) State() State {
+	return stateEnum[mt.read("state")]
 }
 
-type StopAction byte
+type StopAction u8
 
 const (
-	SACoast = StopAction(iota)
+	SACoast StopAction = iota
 	SABrake
 	SAHold
 )
@@ -357,8 +365,8 @@ var sAEnum = map[string]StopAction{
 }
 
 // TODO: Desc
-func (m Motor) StopActionGet() StopAction {
-	return sAEnum[m.read("stop_action")]
+func (mt Motor) StopActionGet() StopAction {
+	return sAEnum[mt.read("stop_action")]
 }
 
 var sAString = [3]string{
@@ -368,17 +376,17 @@ var sAString = [3]string{
 }
 
 // TODO: Desc
-func (m Motor) StopActionSet(action StopAction) {
-	m.write("stop_action", sAString[action])
+func (mt Motor) StopActionSet(action StopAction) {
+	mt.write("stop_action", sAString[action])
 }
 
-// Returns the TimeSetpoint in millis.
-func (m Motor) TimeSetpointGet() (millis uint) {
-	millis, _ = misc.AToI[uint](m.read("time_sp"))
+// Returns the TimeTarget in millis.
+func (mt Motor) TimeTargetGet() (millis uint) {
+	millis, _ = m.AToI[uint](mt.read("time_sp"))
 	return
 }
 
-// Declares the TimeSetpoint in millis.
-func (m Motor) TimeSetpointSet(millis uint) {
-	m.write("time_sp", misc.IToA(millis))
+// Declares the TimeTarget in millis.
+func (mt Motor) TimeTargetSet(millis uint) {
+	mt.write("time_sp", m.IToA(millis))
 }

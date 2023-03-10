@@ -1,24 +1,22 @@
 package main
 
-import misc "github.com/IgneousRed/gomisc"
+// const sensorPath = "/sys/class/lego-sensor"
 
-const sensorPath = "/sys/class/lego-sensor"
+// type NoSensor struct{}
+// type Ultrasonic struct {
+// 	path string
+// }
+// type Infrared struct {
+// 	path string
+// }
+// type Color struct {
+// 	path string
+// }
+// type SensorType interface { // remove "Type"?
+// 	NoSensor | Ultrasonic | Infrared | Color
+// }
 
-type NoSensor misc.Atom
-type Ultrasonic struct {
-	path string
-}
-type Infrared struct {
-	path string
-}
-type Color struct {
-	path string
-}
-type SensorType interface { // remove "Type"?
-	NoSensor | Ultrasonic | Infrared | Color
-}
-
-var sensorsInitialized bool
+// var sensorsInitialized bool
 
 // Blocks until requested Sensors are correctly connected.
 // Initialize Display before Sensors.

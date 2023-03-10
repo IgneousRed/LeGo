@@ -1,8 +1,27 @@
 package main
 
 import (
+	m "github.com/IgneousRed/gomisc"
 	"github.com/ev3go/ev3dev"
 )
+
+type s8 = int8
+type s16 = int16
+type s32 = int32
+type s64 = int64
+type u8 = uint8
+type u16 = uint16
+type u32 = uint32
+type u64 = uint64
+type f32 = float32
+type f64 = float64
+
+type v2 = m.Vector2
+
+// type micros = m.Micros
+
+var V2 = m.Vec2
+var MicroS = m.MicrosGet
 
 //	func getEverything() {
 //		log.Println("get")
@@ -59,10 +78,18 @@ import (
 
 func main() {
 	_ = ev3dev.Back
+
 	dsp := DisplayInit()
 	_, mB, mC, _ := MotorsInit(MTNone, MTLarge, MTLarge, MTNone, dsp)
 	tank := TankInit(mB, mC)
-	// tank.TuneDeceleration(dsp)
-	tank.Distance(360*3, 360*3)
+	// tank.TuneAccAndSpd(dsp)
+	tank.Distance(V2(360*2, 360*2))
+	tank.Distance(V2(360*-2, 360*2))
+	tank.Distance(V2(360*2, 360*-2))
+	tank.Distance(V2(360*2, 360*0))
+	tank.Distance(V2(360*-2, 360*0))
+	tank.Distance(V2(360*0, 360*2))
+	tank.Distance(V2(360*0, 360*-2))
+	tank.Distance(V2(360*-2, 360*-2))
 	// time.Sleep(time.Second * 999)
 }
