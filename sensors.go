@@ -1,4 +1,4 @@
-package main
+package lego
 
 // const sensorPath = "/sys/class/lego-sensor"
 
