@@ -58,7 +58,7 @@ func TankInit(left, right Motor) Tank {
 	return result
 }
 func (t Tank) Positions() (mdeg v2) {
-	return V2(f64(t.motors[0].PositionGet()), f64(t.motors[1].PositionGet()))
+	return V2(f64(t.motors[0].Position()), f64(t.motors[1].Position()))
 }
 func (t Tank) SpeedGet() (mdegPrS v2) {
 	return V2(f64(t.motors[0].Speed()), f64(t.motors[1].Speed()))

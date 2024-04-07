@@ -21,9 +21,9 @@ const (
 type PidK u8
 
 const (
-	PKP PidK = iota
-	PKI
-	PKD
+	PKp PidK = iota
+	PKi
+	PKd
 )
 
 var pidK = [3]string{
@@ -189,7 +189,7 @@ func (mt Motor) Power() (percent int) {
 }
 
 // Returns the PowerTarget in percentage[-100, 100].
-func (mt Motor) PowerTargetGet() (percent int) {
+func (mt Motor) PowerTarget() (percent int) {
 	percent, _ = m.AToI[int](mt.read("duty_cycle_sp"))
 	return
 }
@@ -201,7 +201,7 @@ func (mt Motor) PowerTargetSet(percent int) { // TODO: Test
 }
 
 // Returns the PID controller constant for holding position.
-func (mt Motor) HoldPidGet(k PidK) (gain uint) {
+func (mt Motor) HoldPid(k PidK) (gain uint) {
 	gain, _ = m.AToI[uint](mt.read("hold_pid/" + pidK[k]))
 	return
 }
@@ -229,7 +229,7 @@ var polarityEnum = map[string]Polarity{
 }
 
 // Returns the direction of the motor.
-func (mt Motor) PolarityGet() Polarity {
+func (mt Motor) Polarity() Polarity {
 	return polarityEnum[mt.read("polarity")]
 }
 
@@ -245,7 +245,7 @@ func (mt Motor) PolaritySet(polarity Polarity) {
 }
 
 // Returns the current tacho count.
-func (mt Motor) PositionGet() (count int) {
+func (mt Motor) Position() (count int) {
 	count, _ = m.AToI[int](mt.read("position"))
 	return
 }
@@ -256,7 +256,7 @@ func (mt Motor) PositionSet(count int) {
 }
 
 // Returns the PositionTarget.
-func (mt Motor) PositionTargetGet() (count int) {
+func (mt Motor) PositionTarget() (count int) {
 	count, _ = m.AToI[int](mt.read("position_sp"))
 	return
 }
@@ -269,7 +269,7 @@ func (mt Motor) PositionTargetSet(count int) {
 // Returns the RampDown time in millis.
 // RampDown is time it takes the motor to decrease Power
 // from 100% to 0% in X modes. TODO: Test
-func (mt Motor) RampDownGet() (millis uint) {
+func (mt Motor) RampDown() (millis uint) {
 	millis, _ = m.AToI[uint](mt.read("ramp_down_sp"))
 	return
 }
@@ -284,7 +284,7 @@ func (mt Motor) RampDownSet(millis uint) {
 // Returns the RampUp time in millis.
 // RampUp is time it takes the motor to increase Power
 // from 0% to 100% in X modes.
-func (mt Motor) RampUpGet() (millis uint) {
+func (mt Motor) RampUp() (millis uint) {
 	millis, _ = m.AToI[uint](mt.read("ramp_up_sp"))
 	return
 }
@@ -303,7 +303,7 @@ func (mt Motor) Speed() (speed int) {
 }
 
 // Returns the PID controller constant for maintaining speed.
-func (mt Motor) SpeedPidGet(k PidK) (gain uint) {
+func (mt Motor) SpeedPid(k PidK) (gain uint) {
 	gain, _ = m.AToI[uint](mt.read("speed_pid/" + pidK[k]))
 	return
 }
@@ -314,7 +314,7 @@ func (mt Motor) SpeedPidSet(k PidK, gain uint) {
 }
 
 // Returns the SpeedTarget.
-func (mt Motor) SpeedTargetGet() (speed int) {
+func (mt Motor) SpeedTarget() (speed int) {
 	speed, _ = m.AToI[int](mt.read("speed_sp"))
 	return
 }
@@ -365,7 +365,7 @@ var sAEnum = map[string]StopAction{
 }
 
 // TODO: Desc
-func (mt Motor) StopActionGet() StopAction {
+func (mt Motor) StopAction() StopAction {
 	return sAEnum[mt.read("stop_action")]
 }
 
@@ -381,7 +381,7 @@ func (mt Motor) StopActionSet(action StopAction) {
 }
 
 // Returns the TimeTarget in millis.
-func (mt Motor) TimeTargetGet() (millis uint) {
+func (mt Motor) TimeTarget() (millis uint) {
 	millis, _ = m.AToI[uint](mt.read("time_sp"))
 	return
 }
